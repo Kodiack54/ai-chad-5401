@@ -11,9 +11,6 @@ const logger = new Logger('Chad:TerminalStream');
 // Extraction state per session
 const extractionState = new Map();
 
-// Deduplication: track recently sent messages per session
-const recentMessages = new Map(); // sessionId -> Set of message hashes
-
 /**
  * Process terminal output for a session
  */
@@ -150,63 +147,11 @@ async function triggerExtraction(session, state) {
         projectPath: session.projectPath
       });
 
-      // Store extracted messages and broadcast to connected clients
+      // Store extracted messages
       if (extracted && Array.isArray(extracted.messages)) {
-        const wsHandler = require('./handler');
-
-        // Get or create dedup set for this session
-        if (!recentMessages.has(session.sessionId)) {
-          recentMessages.set(session.sessionId, new Set());
-        }
-        const sentMessages = recentMessages.get(session.sessionId);
-
         for (const msg of extracted.messages) {
           if (msg.role && msg.content) {
-            const content = msg.content.trim();
-
-            // Skip TUI noise that GPT might have extracted
-            if (content.startsWith('Try "') || content.startsWith("Try '")) continue;
-            if (content.includes('Thinking...')) continue;
-            if (content.includes('Using tool:')) continue;
-            if (/^[─━═\-]+$/.test(content)) continue; // Horizontal lines
-            if (/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏·✢✶✻✽*•∴]+$/.test(content)) continue; // Spinners
-            if (content.length < 3) continue; // Too short
-            if (content === 'y' || content === 'n' || content === 'yes' || content === 'no') continue; // Skip bare confirmations
-
-            // Create hash for deduplication (content + role)
-            const msgHash = `${msg.role}:${content.slice(0, 100).toLowerCase().replace(/\s+/g, ' ')}`;
-
-            // Skip if we've sent this recently
-            if (sentMessages.has(msgHash)) {
-              logger.info('Skipping duplicate message', { hash: msgHash.slice(0, 50) });
-              continue;
-            }
-
-            // Add to dedup set (auto-expire after 30 seconds)
-            sentMessages.add(msgHash);
-            setTimeout(() => sentMessages.delete(msgHash), 30000);
-
-            await session.storeMessage(msg.role, content);
-
-            // Determine if this is Claude (assistant) or user (human)
-            // GPT returns 'assistant' or 'user'
-            const isAssistant = msg.role === 'assistant';
-
-            // Broadcast clean message to frontend for chat display
-            wsHandler.broadcast(session.projectPath, {
-              type: 'conversation_message',
-              id: `${msg.role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-              user_id: isAssistant ? 'claude' : 'user',
-              user_name: isAssistant ? 'Claude' : 'You',
-              content: content,
-              created_at: new Date().toISOString()
-            });
-
-            logger.info('Broadcast message', {
-              role: msg.role,
-              isAssistant,
-              contentPreview: content.slice(0, 50)
-            });
+            await session.storeMessage(msg.role, msg.content);
           }
         }
       }
@@ -242,7 +187,6 @@ function getExtractorRegistry() {
  */
 function cleanupSession(sessionId) {
   extractionState.delete(sessionId);
-  recentMessages.delete(sessionId);
 }
 
 /**

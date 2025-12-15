@@ -129,101 +129,37 @@ async function catalogSession(session) {
 
 /**
  * Use Claude Haiku to extract structured knowledge from conversation
- * COMPREHENSIVE EXTRACTION - Everything Susan needs for robust memory
+ * IMPORTANT: Detects when user mentions a DIFFERENT project and routes accordingly
  */
 async function extractKnowledge(conversationText, projectPath) {
-  const prompt = `You are Chad, the AI team's documentation specialist. Analyze this development conversation and extract EVERYTHING useful for our team's memory system.
+  const prompt = `Analyze this development conversation and extract structured information.
 
 CURRENT PROJECT: ${projectPath}
 
 CONVERSATION:
-${conversationText.slice(0, 12000)}
+${conversationText.slice(0, 8000)}
 
-Extract ALL of the following as JSON. Be thorough - Susan needs this for long-term memory.
-If user mentions a DIFFERENT project, include "targetProject" with that project name.
+Extract the following as JSON. IMPORTANT: If the user mentions a DIFFERENT project (like "add this to NextTask" or "for NextBidder" or "for the tradeline project"), include "targetProject" with that project name. Otherwise omit targetProject.
 
 {
   "todos": [
-    { "title": "task title", "description": "details", "priority": "critical|high|medium|low", "status": "pending|in_progress|completed", "assignedTo": "claude|chad|susan|tiffany|user", "targetProject": "if different project" }
+    { "title": "task title", "description": "details", "priority": "high|medium|low", "targetProject": "project name if mentioned, otherwise omit" }
   ],
-
   "completedTodos": [
-    { "title": "task that was finished", "completedBy": "who did it", "targetProject": "if mentioned" }
+    { "title": "task that was completed", "targetProject": "if mentioned" }
   ],
-
-  "commits": [
-    { "hash": "commit hash if mentioned", "message": "commit message", "author": "who committed", "filesChanged": ["list of files"], "buildNumber": "if mentioned" }
-  ],
-
-  "codeChanges": [
-    { "file": "path/to/file", "action": "created|modified|deleted|renamed|moved", "summary": "what changed", "linesAdded": 0, "linesRemoved": 0 }
-  ],
-
-  "structureChanges": [
-    { "path": "folder/or/file/path", "name": "name", "type": "file|folder", "action": "created|deleted|renamed|deprecated|abandoned", "purpose": "what its for", "notes": "any context" }
-  ],
-
-  "schemaChanges": [
-    { "table": "table_name", "action": "created|altered|dropped", "columns": ["column names"], "description": "what changed" }
-  ],
-
-  "bugs": [
-    { "title": "bug description", "severity": "critical|high|medium|low", "file": "related file", "stepsToReproduce": "how to reproduce", "status": "open|fixed", "fixedBy": "what fixed it" }
-  ],
-
   "decisions": [
-    { "title": "what was decided", "rationale": "why this choice", "alternatives": ["other options considered"], "impact": "what this affects", "targetProject": "if mentioned" }
+    { "title": "what was decided", "rationale": "why", "targetProject": "if mentioned" }
   ],
-
   "knowledge": [
-    { "category": "code|architecture|bug|feature|api|database|deployment|security|performance|pattern", "title": "title", "summary": "what was learned", "importance": "critical|high|medium|low", "relatedFiles": ["files involved"], "targetProject": "if mentioned" }
+    { "category": "code|architecture|bug|feature|api", "title": "title", "summary": "what was learned", "targetProject": "if mentioned" }
   ],
-
-  "apis": [
-    { "endpoint": "/api/path", "method": "GET|POST|PATCH|DELETE", "description": "what it does", "parameters": ["params"], "response": "what it returns" }
-  ],
-
-  "ports": [
-    { "port": 5000, "service": "service name", "description": "what runs here" }
-  ],
-
-  "dependencies": [
-    { "package": "package-name", "action": "added|removed|updated", "version": "version if mentioned", "reason": "why" }
-  ],
-
-  "configChanges": [
-    { "file": "config file", "setting": "what setting", "oldValue": "previous", "newValue": "new value", "reason": "why changed" }
-  ],
-
-  "documentation": [
-    { "type": "readme|api|setup|architecture|comment", "file": "file path", "title": "doc title", "summary": "what was documented" }
-  ],
-
-  "errors": [
-    { "error": "error message", "cause": "what caused it", "solution": "how it was fixed", "file": "related file" }
-  ],
-
-  "buildInfo": {
-    "buildNumber": "if mentioned",
-    "version": "if mentioned",
-    "deployedTo": "environment if mentioned",
-    "status": "success|failed"
-  },
-
-  "projectMentions": [
-    { "project": "project name", "context": "why it was mentioned", "action": "what to do with it" }
+  "codeChanges": [
+    { "file": "path/to/file", "action": "created|modified|deleted", "summary": "what changed" }
   ]
 }
 
-IMPORTANT RULES:
-1. Extract EVERYTHING - even small details matter for memory
-2. If something is mentioned but unclear, still include it with what you know
-3. Look for implicit information (e.g., if a file was edited, that's a codeChange)
-4. Track WHO did what (user, claude, etc.)
-5. Note relationships between items
-6. Empty arrays are fine if nothing found for that category
-
-Return valid JSON only.`;
+Only include items that are clearly stated or implied. Return valid JSON only.`;
 
   try {
     const response = await chat(prompt, { extractionMode: true });
