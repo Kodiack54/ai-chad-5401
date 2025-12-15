@@ -129,26 +129,30 @@ async function catalogSession(session) {
 
 /**
  * Use Claude Haiku to extract structured knowledge from conversation
+ * IMPORTANT: Detects when user mentions a DIFFERENT project and routes accordingly
  */
 async function extractKnowledge(conversationText, projectPath) {
   const prompt = `Analyze this development conversation and extract structured information.
 
+CURRENT PROJECT: ${projectPath}
+
 CONVERSATION:
 ${conversationText.slice(0, 8000)}
 
-Extract the following as JSON:
+Extract the following as JSON. IMPORTANT: If the user mentions a DIFFERENT project (like "add this to NextTask" or "for NextBidder" or "for the tradeline project"), include "targetProject" with that project name. Otherwise omit targetProject.
+
 {
   "todos": [
-    { "title": "task title", "description": "details", "priority": "high|medium|low" }
+    { "title": "task title", "description": "details", "priority": "high|medium|low", "targetProject": "project name if mentioned, otherwise omit" }
   ],
   "completedTodos": [
-    { "title": "task that was completed" }
+    { "title": "task that was completed", "targetProject": "if mentioned" }
   ],
   "decisions": [
-    { "title": "what was decided", "rationale": "why" }
+    { "title": "what was decided", "rationale": "why", "targetProject": "if mentioned" }
   ],
   "knowledge": [
-    { "category": "code|architecture|bug|feature|api", "title": "title", "summary": "what was learned" }
+    { "category": "code|architecture|bug|feature|api", "title": "title", "summary": "what was learned", "targetProject": "if mentioned" }
   ],
   "codeChanges": [
     { "file": "path/to/file", "action": "created|modified|deleted", "summary": "what changed" }
