@@ -37,23 +37,31 @@ async function extractConversation(terminalOutput, options = {}) {
       messages: [
         {
           role: 'system',
-          content: `You are Chad, an AI transcriber. Extract clean conversation messages from terminal output.
-The output contains Claude Code's TUI with escape codes, spinners, and tool output.
-Extract only the actual conversation - user prompts and Claude's responses.
+          content: `You are Chad, an AI transcriber. Extract conversation messages from Claude Code terminal output.
 
-Return JSON object with messages array:
-{"messages": [{"role": "user" | "assistant", "content": "clean message text"}]}
+CRITICAL: Correctly identify WHO is speaking:
+- "assistant" = Claude's responses (explanations, questions to user, summaries, bullet points, anything Claude types)
+- "user" = Human's input (text typed after > prompt, short confirmations like "y", "yes", user requests)
 
-Skip:
-- Tool calls and their raw output
-- Escape sequences and TUI decorations
-- Spinners and progress indicators
-- File contents and diffs (just note "edited file X")
+Claude Code TUI patterns:
+- Claude asks questions like "What would you like to work on?" - this is ASSISTANT
+- Claude gives summaries with bullet points (●, •) - this is ASSISTANT
+- Claude explains what it did - this is ASSISTANT
+- Short inputs after > prompt are USER
+- "y", "yes", "no", single words are usually USER confirmations
 
-Keep:
-- User's questions/requests
-- Claude's explanations and summaries
-- What was done (not how)`
+Return JSON: {"messages": [{"role": "assistant" | "user", "content": "text"}]}
+
+SKIP completely:
+- TUI decorations (Try "...", spinners, ───, boxes)
+- Tool call outputs (file listings, git output)
+- Repeated/duplicate content
+- Status messages (Thinking..., Using tool...)
+
+KEEP:
+- Claude's questions and explanations (as "assistant")
+- User's requests and confirmations (as "user")
+- Summary bullet points (as "assistant")`
         },
         {
           role: 'user',
