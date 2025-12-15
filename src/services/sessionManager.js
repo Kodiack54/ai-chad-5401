@@ -24,8 +24,25 @@ class SessionState {
     this.buffer = '';
     this.messages = [];
     this.sequenceNum = 0;
+    this.startedAt = new Date().toISOString();
     this.lastActivity = Date.now();
     this.pendingExtraction = false;
+  }
+
+  /**
+   * Get all messages in this session (for recovery)
+   */
+  async getMessages() {
+    // Return in-memory messages plus any from database
+    try {
+      const { data } = await from('dev_ai_messages')
+        .select('role, content, created_at, sequence_num')
+        .eq('session_id', this.sessionId)
+        .order('sequence_num', { ascending: true });
+      return data || this.messages;
+    } catch (err) {
+      return this.messages;
+    }
   }
 
   appendOutput(data) {
@@ -212,6 +229,18 @@ function getAllSessions() {
   return Array.from(activeSessions.values());
 }
 
+/**
+ * Get active session for a specific project (for recovery)
+ */
+function getActiveSessionForProject(projectPath) {
+  for (const session of activeSessions.values()) {
+    if (session.projectPath === projectPath) {
+      return session;
+    }
+  }
+  return null;
+}
+
 module.exports = {
   initialize,
   createSession,
@@ -219,5 +248,6 @@ module.exports = {
   getActiveCount,
   endSession,
   getAllSessions,
+  getActiveSessionForProject,
   SessionState
 };

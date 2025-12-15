@@ -80,6 +80,113 @@ router.post('/message', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/session/recover - Crash recovery endpoint
+ * Returns the current/most recent session for a project so Claude can resume
+ */
+router.get('/session/recover', async (req, res) => {
+  const projectPath = req.query.project;
+
+  if (!projectPath) {
+    return res.status(400).json({ error: 'project query param required' });
+  }
+
+  try {
+    // First check for active session in memory
+    const activeSession = sessionManager.getActiveSessionForProject(projectPath);
+    if (activeSession) {
+      const messages = await activeSession.getMessages();
+      return res.json({
+        status: 'active',
+        sessionId: activeSession.sessionId,
+        projectPath: activeSession.projectPath,
+        startedAt: activeSession.startedAt,
+        messageCount: messages.length,
+        messages: messages.slice(-50), // Last 50 messages for context
+        summary: buildSessionSummary(messages)
+      });
+    }
+
+    // Otherwise get most recent session from database
+    const { data: sessions, error: sessionsError } = await from('dev_ai_sessions')
+      .select('id, project_path, started_at, ended_at, status, summary')
+      .eq('project_path', projectPath)
+      .order('started_at', { ascending: false })
+      .limit(1);
+
+    if (sessionsError) throw sessionsError;
+
+    if (!sessions || sessions.length === 0) {
+      return res.json({
+        status: 'none',
+        message: 'No previous sessions found for this project'
+      });
+    }
+
+    const session = sessions[0];
+
+    // Get messages from the session
+    const { data: messages, error: messagesError } = await from('dev_ai_messages')
+      .select('role, content, created_at, sequence_num')
+      .eq('session_id', session.id)
+      .order('sequence_num', { ascending: true });
+
+    if (messagesError) throw messagesError;
+
+    res.json({
+      status: session.status,
+      sessionId: session.id,
+      projectPath: session.project_path,
+      startedAt: session.started_at,
+      endedAt: session.ended_at,
+      storedSummary: session.summary,
+      messageCount: messages?.length || 0,
+      messages: (messages || []).slice(-50), // Last 50 messages
+      summary: buildSessionSummary(messages || [])
+    });
+
+    logger.info('Session recovery served', {
+      projectPath,
+      sessionId: session.id,
+      messageCount: messages?.length || 0
+    });
+  } catch (err) {
+    logger.error('Session recovery failed', { error: err.message, projectPath });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Build a quick summary of session messages for Claude's briefing
+ */
+function buildSessionSummary(messages) {
+  if (!messages || messages.length === 0) {
+    return 'No messages in this session yet.';
+  }
+
+  const parts = [];
+  parts.push(`Session has ${messages.length} messages.`);
+
+  // Get last few exchanges
+  const recentMessages = messages.slice(-10);
+  const userMessages = recentMessages.filter(m => m.role === 'user');
+  const assistantMessages = recentMessages.filter(m => m.role === 'assistant');
+
+  if (userMessages.length > 0) {
+    const lastUserMsg = userMessages[userMessages.length - 1];
+    const preview = lastUserMsg.content?.slice(0, 200) || '';
+    parts.push(`Last user message: "${preview}${lastUserMsg.content?.length > 200 ? '...' : ''}"`);
+  }
+
+  if (assistantMessages.length > 0) {
+    const lastAssistantMsg = assistantMessages[assistantMessages.length - 1];
+    const preview = lastAssistantMsg.content?.slice(0, 200) || '';
+    parts.push(`Last assistant response: "${preview}${lastAssistantMsg.content?.length > 200 ? '...' : ''}"`);
+  }
+
+  return parts.join('\n');
+}
+
 // Recent conversations
 router.get('/recent', async (req, res) => {
   const limit = parseInt(req.query.limit) || 20;

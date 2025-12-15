@@ -44,7 +44,12 @@ async function start() {
   wsHandler.attach(server);
   logger.info('WebSocket handler attached');
 
-  // 6. Ready
+  // 6. Start cataloger background job (every 30 min)
+  const cataloger = require('./src/services/cataloger');
+  cataloger.start();
+  logger.info('Cataloger background job started');
+
+  // 7. Ready
   logger.info('Chad Transcriber ready', {
     port: config.PORT,
     extractors: extractorRegistry.count(),
