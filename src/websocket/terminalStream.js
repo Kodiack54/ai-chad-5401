@@ -51,20 +51,30 @@ function cleanTerminalOutput(data) {
   if (!data) return '';
 
   let clean = data
+    // Remove ANSI escape sequences (ESC [ ... letter)
+    .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
+    // Remove visible escape codes without ESC prefix (corrupted terminals)
+    .replace(/\[([0-9;]*[A-Za-z])/g, '')
     // Remove ANSI color codes
     .replace(/\x1b\[[0-9;]*m/g, '')
     // Remove cursor control sequences
     .replace(/\x1b\[\?[0-9;]*[a-zA-Z]/g, '')
-    // Remove other escape sequences
-    .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
+    // Remove OSC sequences (title bar, etc)
+    .replace(/\x1b\][^\x07]*\x07/g, '')
+    // Remove remaining escape characters
+    .replace(/\x1b/g, '')
     // Remove carriage returns (keep newlines)
     .replace(/\r(?!\n)/g, '')
     // Normalize line endings
     .replace(/\r\n/g, '\n')
     // Remove null bytes
-    .replace(/\x00/g, '');
+    .replace(/\x00/g, '')
+    // Collapse multiple blank lines
+    .replace(/\n{3,}/g, '\n\n')
+    // Remove lines that are just dashes/underscores (separators)
+    .replace(/^[─━─\-_═]+$/gm, '');
 
-  return clean;
+  return clean.trim();
 }
 
 /**
