@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { from } = require('../lib/db');
-const { chat } = require('../lib/openai');
+const { chat } = require('../lib/claude');
 const { Logger } = require('../lib/logger');
 
 const logger = new Logger('Chad:Chat');
