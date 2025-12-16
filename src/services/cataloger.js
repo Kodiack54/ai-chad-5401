@@ -116,7 +116,12 @@ async function catalogSession(session) {
         sessionId: session.id,
         todos: extraction.todos?.length || 0,
         completedTodos: extraction.completedTodos?.length || 0,
-        knowledge: extraction.knowledge?.length || 0
+        knowledge: extraction.knowledge?.length || 0,
+        structure: extraction.structureChanges?.length || 0,
+        codeChanges: extraction.codeChanges?.length || 0,
+        commits: extraction.commits?.length || 0,
+        bugs: extraction.bugs?.length || 0,
+        apis: extraction.apis?.length || 0
       });
     }
   } catch (err) {
@@ -130,6 +135,7 @@ async function catalogSession(session) {
 /**
  * Use Claude Haiku to extract structured knowledge from conversation
  * IMPORTANT: Detects when user mentions a DIFFERENT project and routes accordingly
+ * IMPORTANT: Extracts file/folder structure when user shares tree diagrams
  */
 async function extractKnowledge(conversationText, projectPath) {
   const prompt = `Analyze this development conversation and extract structured information.
@@ -137,29 +143,58 @@ async function extractKnowledge(conversationText, projectPath) {
 CURRENT PROJECT: ${projectPath}
 
 CONVERSATION:
-${conversationText.slice(0, 8000)}
+${conversationText.slice(0, 12000)}
 
-Extract the following as JSON. IMPORTANT: If the user mentions a DIFFERENT project (like "add this to NextTask" or "for NextBidder" or "for the tradeline project"), include "targetProject" with that project name. Otherwise omit targetProject.
+Extract the following as JSON. Be thorough - extract ALL relevant information.
+
+IMPORTANT RULES:
+1. If user mentions a DIFFERENT project, include "targetProject" with that name
+2. If user shares a file/folder tree (like "├── folder/"), extract ALL items as structureChanges
+3. For structure trees, preserve the hierarchy - include parent_path for nested items
+4. Extract file purposes from context or comments in the tree
 
 {
   "todos": [
-    { "title": "task title", "description": "details", "priority": "high|medium|low", "targetProject": "project name if mentioned, otherwise omit" }
+    { "title": "task title", "description": "details", "priority": "high|medium|low", "targetProject": "if mentioned" }
   ],
   "completedTodos": [
-    { "title": "task that was completed", "targetProject": "if mentioned" }
+    { "title": "task completed", "targetProject": "if mentioned" }
   ],
   "decisions": [
     { "title": "what was decided", "rationale": "why", "targetProject": "if mentioned" }
   ],
   "knowledge": [
-    { "category": "code|architecture|bug|feature|api", "title": "title", "summary": "what was learned", "targetProject": "if mentioned" }
+    { "category": "code|architecture|bug|feature|api|database|config", "title": "title", "summary": "what was learned", "targetProject": "if mentioned" }
   ],
   "codeChanges": [
     { "file": "path/to/file", "action": "created|modified|deleted", "summary": "what changed" }
+  ],
+  "structureChanges": [
+    { "path": "full/path/to/item", "name": "filename or folder name", "type": "file|folder|module", "action": "created|documented|modified|deleted", "purpose": "what this file/folder does", "notes": "additional context", "parent_path": "parent folder path if nested" }
+  ],
+  "commits": [
+    { "hash": "if mentioned", "message": "commit message", "filesChanged": ["list", "of", "files"] }
+  ],
+  "bugs": [
+    { "title": "bug description", "severity": "high|medium|low", "file": "related file", "status": "open|fixed" }
+  ],
+  "apis": [
+    { "endpoint": "/api/path", "method": "GET|POST|etc", "description": "what it does" }
+  ],
+  "ports": [
+    { "port": 3000, "service": "service name", "description": "what runs here" }
   ]
 }
 
-Only include items that are clearly stated or implied. Return valid JSON only.`;
+STRUCTURE EXTRACTION RULES:
+- When you see tree diagrams (├──, └──, │), extract EVERY file and folder shown
+- For folders ending with /, set type: "folder"
+- For .js, .ts, .json files, set type: "file"
+- For folders containing index.js or with MVC structure, set type: "module"
+- Extract purpose from inline comments like "# Main entry" or "(categories.json, config.json)"
+- Group related items under their parent folder
+
+Return valid JSON only. Include empty arrays [] for categories with no items.`;
 
   try {
     const response = await chat(prompt, { extractionMode: true });
