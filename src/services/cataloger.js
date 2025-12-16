@@ -164,7 +164,7 @@ IMPORTANT RULES:
     { "title": "what was decided", "rationale": "why", "targetProject": "if mentioned" }
   ],
   "knowledge": [
-    { "category": "code|architecture|bug|feature|api|database|config", "title": "title", "summary": "what was learned", "targetProject": "if mentioned" }
+    { "category": "code|architecture|feature|api|database|config|project", "title": "title", "summary": "what was learned", "targetProject": "if mentioned" }
   ],
   "codeChanges": [
     { "file": "path/to/file", "action": "created|modified|deleted", "summary": "what changed" }
@@ -193,6 +193,11 @@ STRUCTURE EXTRACTION RULES:
 - For folders containing index.js or with MVC structure, set type: "module"
 - Extract purpose from inline comments like "# Main entry" or "(categories.json, config.json)"
 - Group related items under their parent folder
+
+BUG VS KNOWLEDGE RULES:
+- Bugs, issues, errors, problems, and fixes go in the "bugs" array ONLY - NOT in knowledge
+- Knowledge is for learning, architecture, features, configs, ports - NOT bugs
+- If something is a bug report or bug fix, put it in bugs with status "open" or "fixed"
 
 Return valid JSON only. Include empty arrays [] for categories with no items.`;
 
