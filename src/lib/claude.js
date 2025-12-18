@@ -6,6 +6,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
 const { Logger } = require('./logger');
+const { logAnthropicResponse } = require('./usageLogger');
 
 const logger = new Logger('Chad:Claude');
 
@@ -56,6 +57,9 @@ ${context.sessionInfo || ''}
 
 Keep responses concise and helpful.`
     });
+
+    // Log usage
+    await logAnthropicResponse(response, 'chat', context.projectPath, message.slice(0, 100));
 
     return response.content[0].text;
   } catch (error) {
