@@ -7,6 +7,7 @@ const WebSocket = require('ws');
 const { Logger } = require('../lib/logger');
 const sessionManager = require('../services/sessionManager');
 const terminalStream = require('./terminalStream');
+const { stripAnsi } = require('../../../shared/stripAnsi');
 
 const logger = new Logger('Chad:WebSocket');
 
@@ -222,7 +223,8 @@ module.exports = {
  * These come from external Claude Code instances
  */
 async function handleExternalMessage(ws, message, projectPath, userId) {
-  const { role, content, source, hook, ts } = message;
+  const { role, source, hook, ts } = message;
+  const content = stripAnsi(message.content);
   
   logger.info('External message received', { 
     projectPath, 

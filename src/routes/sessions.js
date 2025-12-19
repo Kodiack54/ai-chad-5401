@@ -228,7 +228,7 @@ router.get('/recent', async (req, res) => {
   }
 });
 
-module.exports = router;
+// MOVED TO END
 
 // Sessions for UI (with proper format)
 router.get('/sessions/recent', async (req, res) => {
@@ -263,3 +263,4 @@ router.get('/sessions/recent', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+module.exports = router;

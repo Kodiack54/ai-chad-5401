@@ -348,3 +348,95 @@ module.exports = {
   parseJsonSafe,
   cleanJsonResponse
 };
+
+// Import category detector
+const { categorizeExtraction } = require('./categoryDetector');
+
+/**
+ * Enhanced toSusanFormat with category suggestions
+ * Chad suggests, Susan confirms/overrides
+ */
+function toSusanFormatWithCategories(smartData) {
+  // Get categorized data
+  const categorized = categorizeExtraction(smartData);
+  
+  return {
+    // Standard format
+    todos: (smartData.todos || []).map(t => ({
+      title: t.task,
+      description: t.context,
+      priority: t.priority || 'medium',
+      blockedBy: t.blockedBy,
+      relatedTo: t.relatedTo
+    })),
+    
+    completedTodos: (smartData.completedItems || []).map(c => ({
+      title: c.task,
+      verifiedBy: c.verifiedBy
+    })),
+    
+    codeChanges: smartData.codeChanges || [],
+    sessionSummary: smartData.sessionSummary,
+    continuity: smartData.continuity,
+    dependencies: smartData.dependencies || [],
+    
+    // NEW: Categorized knowledge items for Susan
+    knowledgeItems: [
+      ...categorized.knowledge.map(k => ({
+        title: k.title,
+        summary: k.insight,
+        fullContent: k.applicability,
+        suggestedCategory: k.suggestedCategory,
+        categoryConfidence: k.categoryConfidence,
+        categorySignals: k.categorySignals,
+        alternateCategory: k.alternateCategory,
+        sourceType: 'discovery'
+      })),
+      ...categorized.decisionsAsKnowledge.map(d => ({
+        title: d.title,
+        summary: d.summary,
+        fullContent: `Alternatives: ${d.alternatives || 'None considered'}. Impact: ${d.impact || 'Unknown'}`,
+        suggestedCategory: d.suggestedCategory,
+        categoryConfidence: d.categoryConfidence,
+        categorySignals: d.categorySignals,
+        sourceType: 'decision'
+      })),
+      ...categorized.issuesAsKnowledge.map(i => ({
+        title: i.title,
+        summary: i.summary,
+        fullContent: i.files?.join(', ') || '',
+        suggestedCategory: i.suggestedCategory,
+        categoryConfidence: i.categoryConfidence,
+        categorySignals: i.categorySignals,
+        sourceType: 'issue',
+        issueStatus: i.status
+      }))
+    ],
+    
+    // Keep legacy format for backwards compatibility
+    decisions: (smartData.decisions || []).map(d => ({
+      title: d.what,
+      rationale: d.why,
+      alternatives: d.alternatives,
+      impact: d.impact
+    })),
+    
+    knowledge: (smartData.discoveries || []).map(d => ({
+      category: d.category,
+      title: d.title,
+      summary: d.insight,
+      applicability: d.applicability
+    })),
+    
+    bugs: (smartData.problems || []).filter(p => p.status !== 'fixed').map(p => ({
+      title: p.description,
+      severity: 'medium',
+      status: p.status === 'unresolved' ? 'open' : 'in_progress',
+      rootCause: p.rootCause,
+      relatedFiles: p.relatedFiles
+    }))
+  };
+}
+
+// Export new function
+module.exports.toSusanFormatWithCategories = toSusanFormatWithCategories;

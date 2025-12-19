@@ -20,6 +20,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Team Chat routes
+const teamChatRoutes = require('./src/routes/teamChat');
+app.use('/api/team-chat', teamChatRoutes);
+
 const PORT = process.env.PORT || 5401;
 const SUSAN_URL = process.env.SUSAN_URL || 'http://localhost:5403';
 

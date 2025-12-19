@@ -122,7 +122,9 @@ function connectToInternalClaude() {
           const msg = JSON.parse(data.toString());
           if (msg.type === 'monitor_output' && msg.data) {
             buffer.append(msg.data);
-            logger.debug('Monitor output received', { sessionId: msg.sessionId, dataLen: msg.data.length });
+            buffer.userId = msg.userId || buffer.userId;
+            buffer.projectPath = msg.projectPath || buffer.projectPath;
+            logger.debug('Monitor output received', { sessionId: msg.sessionId, userId: msg.userId, projectPath: msg.projectPath, dataLen: msg.data.length });
             return;
           } else if (msg.type === 'monitor_connected') {
             logger.info('Connected as monitor to Server Claude', { activeSessions: msg.activeSessions });

@@ -9,6 +9,7 @@ const { from } = require('../lib/db');
 const { Logger } = require('../lib/logger');
 const config = require('../lib/config');
 const { extractSmart, toSusanFormat } = require('../lib/smartExtractor');
+const { extractWithContext, toSusanFormatWithRouting } = require('./contextAwareExtractor');
 
 const logger = new Logger('Chad:Cataloger');
 
@@ -215,11 +216,11 @@ async function catalogSession(session) {
     const previousContext = await getPreviousContext(session.project_path);
 
     // SMART extraction
-    const smartExtraction = await extractSmart(conversationText, session.project_path, previousContext);
+    const smartExtraction = await extractWithContext(conversationText, { projectPath: session.project_path, previousContext });
 
     if (smartExtraction) {
       // Convert to Susan's format (backward compatible)
-      const susanData = toSusanFormat(smartExtraction);
+      const susanData = toSusanFormatWithRouting(smartExtraction);
 
       // Send to Susan
       await sendToSusan(session.id, session.project_path, susanData);

@@ -11,6 +11,7 @@ const chatRoutes = require('./chat');
 const catalogRoutes = require('./catalog');
 const sourcesRoutes = require('./sources');
 const extractionsRoutes = require('./extractions');
+const teamChatRoutes = require('./teamChat');
 
 const app = express();
 app.use(cors());
@@ -23,5 +24,6 @@ app.use('/api', chatRoutes);
 app.use('/api', catalogRoutes);
 app.use('/api/sources', sourcesRoutes);
 app.use('/api/extractions', extractionsRoutes);
+app.use('/api/team-chat', teamChatRoutes);
 
 module.exports = app;

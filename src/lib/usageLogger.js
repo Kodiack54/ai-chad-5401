@@ -97,3 +97,66 @@ module.exports = {
   logAnthropicResponse,
   calculateCost
 };
+
+// OpenAI pricing (per 1M tokens)
+const OPENAI_PRICING = {
+  'gpt-4o': { input: 2.5, output: 10.0 },
+  'gpt-4o-mini': { input: 0.15, output: 0.60 },
+  'gpt-4-turbo': { input: 10.0, output: 30.0 },
+  'gpt-4': { input: 30.0, output: 60.0 },
+  'gpt-3.5-turbo': { input: 0.5, output: 1.5 },
+};
+
+function calculateOpenAICost(model, inputTokens, outputTokens) {
+  const pricing = OPENAI_PRICING[model] || OPENAI_PRICING['gpt-4o-mini'];
+  const inputCost = (inputTokens / 1_000_000) * pricing.input;
+  const outputCost = (outputTokens / 1_000_000) * pricing.output;
+  return inputCost + outputCost;
+}
+
+/**
+ * Log OpenAI API usage to database
+ */
+async function logOpenAIUsage(response, requestType = 'chat', startTime = null) {
+  if (!response?.usage) return response;
+
+  const responseTimeMs = startTime ? Date.now() - startTime : null;
+  const inputTokens = response.usage.prompt_tokens || 0;
+  const outputTokens = response.usage.completion_tokens || 0;
+  const model = response.model || 'gpt-4o-mini';
+
+  try {
+    const costUsd = calculateOpenAICost(model, inputTokens, outputTokens);
+
+    const { error } = await from('dev_ai_usage').insert({
+      service: 'openai',
+      model,
+      task_type: requestType,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: inputTokens + outputTokens,
+      cost_usd: costUsd,
+      duration_ms: responseTimeMs,
+      success: true
+    });
+
+    if (error) {
+      logger.error('Failed to log OpenAI usage', { error: error.message });
+      return response;
+    }
+
+    logger.debug('OpenAI usage logged', {
+      model,
+      tokens: inputTokens + outputTokens,
+      cost: `$${costUsd.toFixed(6)}`
+    });
+
+    return response;
+  } catch (err) {
+    logger.error('OpenAI usage logging error', { error: err.message });
+    return response;
+  }
+}
+
+module.exports.logOpenAIUsage = logOpenAIUsage;
+module.exports.calculateOpenAICost = calculateOpenAICost;
