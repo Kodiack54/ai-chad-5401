@@ -251,6 +251,10 @@ async function handleExternalMessage(ws, message, projectPath, userId) {
     // Add message to session
     if (session && content) {
       await session.storeMessage(role || 'unknown', content);
+      // Feed to sourceWatcher for periodic dumps
+      const sourceWatcher = require("../services/sourceWatcher");
+      const label = role === "user" ? "[USER]" : "[ASSISTANT]";
+      sourceWatcher.appendExternalClaude(`${label} ${content}\n`);
     }
 
     ws.send(JSON.stringify({
