@@ -229,8 +229,8 @@ async function performDump(sourceId, sourceName) {
   const { content, count } = buffer.clear();
 
   try {
-    // Use buffer's projectPath if available, otherwise default to Kodiack_Studio
-    const projectPath = buffer.projectPath || '/var/www/Kodiack_Studio';
+    // Use buffer's projectPath if available, otherwise default to Studio
+    const projectPath = buffer.projectPath || '/var/www/Studio/ai-team/ai-chad-5401';
 
     // Create session record
     const { data: session, error: sessionError } = await from('dev_ai_sessions')

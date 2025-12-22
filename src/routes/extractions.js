@@ -67,7 +67,7 @@ router.post('/extract/:sessionId', async (req, res) => {
     
     const results = await extractionStore.extractAndStoreFromDump(
       session.id,
-      session.project_path || '/var/www/NextBid_Dev/dev-studio-5000',
+      session.project_path || '/var/www/Studio/ai-team/ai-chad-5401',
       session.raw_content
     );
     
