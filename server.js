@@ -272,6 +272,13 @@ wss.on('connection', async (ws, req) => {
         // User input (from chat or terminal)
         session.storeMessage('user', msg.content);
         sourceWatcher.appendExternalClaude(`[USER] ${msg.content}\n`);
+      } else if (msg.type === 'message') {
+        // Message from hook (external Claude Code sessions)
+        const role = msg.role || 'user';
+        const content = msg.content || '';
+        session.storeMessage(role, content);
+        const label = role === 'user' ? '[USER]' : '[ASSISTANT]';
+        sourceWatcher.appendExternalClaude(`${label} ${content}\n`);
       }
     } catch (err) {
       // Might be raw text
@@ -523,7 +530,7 @@ app.post('/api/chat', async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: `You are Chad, the AI Team Transcriber at NextBid Dev Studio. You work on port 5401.
+          content: `You are Chad, the AI Team Transcriber at Kodiack Studios. You work on port 5401.
 
 Your job:
 - Watch Claude's terminal output and transcribe conversations

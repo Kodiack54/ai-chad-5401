@@ -15,20 +15,20 @@ const config = require('../lib/config');
 
 const logger = new Logger('Chad:SourceWatcher');
 
-// Source definitions
+// Source definitions - dumps every 5 min, staggered to avoid conflicts
 const SOURCES = {
   EXTERNAL_CLAUDE: {
     id: 'external_claude',
     name: 'External Claude (Local)',
     type: 'websocket',
-    dumpMinutes: [0, 30],
+    dumpMinutes: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], // Every 5 min at :00
     description: 'Local Claude Code terminals'
   },
   CHAT_SYSTEMS: {
     id: 'chat_systems',
     name: 'Chat Systems',
     type: 'api_poll',
-    dumpMinutes: [10, 40],
+    dumpMinutes: [2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57], // Every 5 min at :02
     endpoints: [
       { name: 'susan_chat', url: `${config.SUSAN_URL}/api/chat/recent` },
       { name: 'chad_chat', url: `http://localhost:${config.PORT}/api/recent` }
@@ -40,7 +40,7 @@ const SOURCES = {
     name: 'Internal Claude (Server)',
     type: 'websocket',
     url: process.env.CLAUDE_SERVER_WS || 'ws://localhost:5400?mode=monitor',
-    dumpMinutes: [20, 50],
+    dumpMinutes: [4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 54, 59], // Every 5 min at :04
     description: 'Server-side Claude terminal at :5400'
   }
 };
@@ -229,10 +229,13 @@ async function performDump(sourceId, sourceName) {
   const { content, count } = buffer.clear();
 
   try {
+    // Use buffer's projectPath if available, otherwise default to Kodiack_Studio
+    const projectPath = buffer.projectPath || '/var/www/Kodiack_Studio';
+
     // Create session record
     const { data: session, error: sessionError } = await from('dev_ai_sessions')
       .insert({
-        project_path: '/var/www/NextBid_Dev/dev-studio-5000',
+        project_path: projectPath,
         source_type: sourceId,
         source_name: sourceName,
         status: 'pending_review',
@@ -248,8 +251,8 @@ async function performDump(sourceId, sourceName) {
     // Run extraction on the raw content
     const extractionStore = require('./extractionStore');
     const extractions = await extractionStore.extractAndStoreFromDump(
-      session.id, 
-      '/var/www/NextBid_Dev/dev-studio-5000',
+      session.id,
+      projectPath,
       content
     );
 
