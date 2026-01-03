@@ -161,7 +161,7 @@ function parseRoutingFromCwd(cwd) {
   const normalized = cwd.replace(/\\/g, "/").toLowerCase();
   const portMatch = normalized.match(/([a-z0-9-]+)-(\d{4,5})/);
   if (portMatch) {
-    const slug = portMatch[1];
+    const slug = portMatch[1] + '-' + portMatch[2];
     const port = parseInt(portMatch[2], 10);
     if (port >= 4000 && port <= 9999) {
       return { project_slug: slug, team_port: port };
