@@ -174,6 +174,42 @@ function parseRoutingFromCwd(cwd) {
   return { project_slug: null, team_port: null };
 }
 
+function isHomePath(p) {
+  if (!p) return false;
+  const c = p.toLowerCase();
+  return c.includes('/home/') || c.includes('/root/') || c.endsWith('/root') || c.includes('\\users\\') || /^[a-z]:\\users\\/i.test(c);
+}
+
+function resolveProjectSlug(win, cwd) {
+  if (win.project_slug && win.project_slug !== 'unassigned') {
+    return { slug: win.project_slug, reason: 'transcript', port: win.team_port };
+  }
+  if (cwd && !isHomePath(cwd)) {
+    const routing = parseRoutingFromCwd(cwd);
+    if (routing.project_slug) {
+      return { slug: routing.project_slug, reason: 'cwd', port: routing.team_port };
+    }
+  }
+  const haystack = [win.session_file || '', win.project_folder || '', (win.content || '').substring(0, 5000)].join(' ').toLowerCase();
+  const patterns = [
+    { match: 'kodiack-dashboard', slug: 'kodiack-dashboard-5500' },
+    { match: 'dashboard-5500', slug: 'kodiack-dashboard-5500' },
+    { match: 'ai-jen', slug: 'ai-jen-5402' },
+    { match: 'ai-susan', slug: 'ai-susan-5403' },
+    { match: 'ai-chad', slug: 'ai-chad-5401' },
+    { match: 'ai-jason', slug: 'ai-jason-5408' },
+    { match: 'terminal-server', slug: 'terminal-server-5400' },
+    { match: 'nextbid', slug: 'nextbid' },
+    { match: 'kodiack-studio', slug: 'kodiack-studio' },
+  ];
+  for (const pat of patterns) {
+    if (haystack.includes(pat.match)) {
+      return { slug: pat.slug, reason: 'content:' + pat.match, port: null };
+    }
+  }
+  logger.warn('Slug unresolved', { session_file: (win.session_file || '').substring(0, 80), cwd: (cwd || '').substring(0, 80), content_len: (win.content || '').length });
+  return { slug: 'unassigned', reason: 'no_match', port: null };
+}
 
 async function processTranscripts() {
   logger.info('Processing transcripts...');
@@ -210,18 +246,12 @@ async function processTranscripts() {
         const content = window.content;
         const messageCount = (content.match(/\n/g) || []).length + 1;
 
-        // CWD-based routing fallback when transcript path has no Projects marker
-        if (!window.project_slug) {
-          const cwd = extractCwdFromContent(content);
-          if (cwd) {
-            const routing = parseRoutingFromCwd(cwd);
-            if (routing.project_slug) {
-              window.project_slug = routing.project_slug;
-              window.team_port = routing.team_port;
-              logger.info("Routing from CWD", { cwd, slug: routing.project_slug, port: routing.team_port });
-            }
-          }
-        }
+        // Resolve slug using priority fallback system
+        const cwd = extractCwdFromContent(content);
+        const resolved = resolveProjectSlug(window, cwd);
+        const finalSlug = resolved.slug;
+        const finalPort = resolved.port || window.team_port;
+        if (resolved.reason !== 'transcript') logger.info('Slug resolved', { slug: finalSlug, reason: resolved.reason });
 
 
         if (content.length < 100) {
@@ -232,13 +262,11 @@ async function processTranscripts() {
         // Resolve project_uuid from project_slug (fallback: unassigned)
         let resolvedProjectUuid = null;
 
-        if (window.project_slug) {
-          const { data: proj, error: projErr } = await from('dev_projects')
-            .select('id')
-            .eq('slug', window.project_slug)
-            .single();
-          if (!projErr && proj?.id) resolvedProjectUuid = proj.id;
-        }
+        const { data: proj, error: projErr } = await from('dev_projects')
+          .select('id')
+          .eq('slug', finalSlug)
+          .single();
+        if (!projErr && proj?.id) resolvedProjectUuid = proj.id;
 
         if (!resolvedProjectUuid) {
           const { data: unassigned, error: unassignedErr } = await from('dev_projects')
@@ -252,8 +280,8 @@ async function processTranscripts() {
           .insert({
             project_id: resolvedProjectUuid,
             project_uuid: resolvedProjectUuid,
-            project_slug: window.project_slug || 'unassigned',
-            team_port: window.team_port,
+            project_slug: finalSlug,
+            team_port: finalPort,
             source_type: window.source_type || 'transcript',
             source_name: window.session_file,
             status: 'active',
@@ -278,6 +306,7 @@ async function processTranscripts() {
 
         logger.info('Created session from window', {
           project: projectPath,
+          slug: finalSlug,
           transcripts: window.transcripts.length,
           messages: messageCount
         });
